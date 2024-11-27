@@ -44,6 +44,7 @@ public class HardwareBase27545 extends DraculaBase {
     }
 
     public void positionTo2(double xTarg, double yTarg, double desiredHeading, double driveSpeed) {
+        //autonomous navigation
         odometryComputer.bulkUpdate();
 
         double headingThreshold=1.5, closeEnough=1.5,
@@ -52,6 +53,7 @@ public class HardwareBase27545 extends DraculaBase {
         double currentX,currentY,currentHeading;
 
         Pose2DGobilda pos = odometryComputer.getPosition();
+        Pose2DGobilda vel = odometryComputer.getVelocity();
         currentX=pos.getX(DistanceUnit.INCH);
         currentY=pos.getY(DistanceUnit.INCH);
 
@@ -59,12 +61,22 @@ public class HardwareBase27545 extends DraculaBase {
                 Math.abs(yTarg - currentY));
         currentHeading=getOdoFieldHeading();
         headingError= desiredHeading-currentHeading;
+
+        double currentXVel;
+        double currentYVel;
+        double velocityToTarget;
+        double derivative;
+        double Kd = 0.1;
+
         // now loop and drive toward the target pose
         while(Math.abs(distanceToTarget) > closeEnough || Math.abs(headingError)>headingThreshold) {
             if(!((LinearOpMode) callingOpMode).opModeIsActive()) {
                 return;
             }
+
+
             odometryComputer.bulkUpdate();
+            vel = odometryComputer.getVelocity();
             pos = odometryComputer.getPosition();// update position for robot
             currentX=pos.getX(DistanceUnit.INCH);
             currentY=pos.getY(DistanceUnit.INCH);
@@ -74,7 +86,13 @@ public class HardwareBase27545 extends DraculaBase {
             distanceToTarget=Math.hypot(Math.abs(yTarg - currentY),
                     Math.abs(xTarg - currentX));
 
-            v=Math.min(driveSpeed,distanceToTarget*Kp);
+            currentXVel = vel.getX(DistanceUnit.INCH); // vel = Inch / sec (according to gobilda)
+            currentYVel = vel.getY(DistanceUnit.INCH);
+            velocityToTarget = Math.hypot(Math.abs(currentYVel), Math.abs(currentXVel));
+            derivative = Kd * velocityToTarget;
+
+
+            v=Math.min(driveSpeed,distanceToTarget*Kp - derivative);
             v=Math.max(v,.1);
            // v *= 0.1;
             // v is the magnitude of the velocity vector we want the robot
@@ -104,7 +122,7 @@ public class HardwareBase27545 extends DraculaBase {
             
             // send these motor powers to the mecanum drive
             applyMecPower2(-vStrafeRobot,-vForwardRobot,r);
-            
+
         } // end of the while loop
         applyMecPower2(0,0,0);
         
