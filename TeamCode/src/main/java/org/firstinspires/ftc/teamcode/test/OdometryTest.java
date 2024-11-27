@@ -1,13 +1,11 @@
 package org.firstinspires.ftc.teamcode.test;
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.Alliance;
 import org.firstinspires.ftc.teamcode.LinearOpMode9808;
-import org.firstinspires.ftc.teamcode.gobilda.GoBildaPinpointDriver;
 import org.firstinspires.ftc.teamcode.gobilda.Pose2DGobilda;
 
 import java.util.Locale;
@@ -57,7 +55,7 @@ public class OdometryTest extends LinearOpMode9808 {
                 //driveBase.positionTo2(-16.9, 5.5, -46.4, 0.3);
                 
                 
-                driveBase.positionTo2(12, 8, -45, 0.5);
+                driveBase.driveTo(12, 8, -45, 0.5);
                 
                 // driveBase.positionTo2(0, 4, 0, 0.2);
                 // sleep(1000);
