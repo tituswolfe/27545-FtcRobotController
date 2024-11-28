@@ -64,6 +64,7 @@ public class HardwareBase27545 extends DraculaBase {
                 Math.abs(targetYPos - currentYPos),
                 Math.abs(targetXPos - currentXPos)
         );
+        double directionToTarget;
 
         // Update heading
         double currentHeading = getOdoFieldHeading();
@@ -78,20 +79,17 @@ public class HardwareBase27545 extends DraculaBase {
                 Math.abs(currentXVel)
         );
 
-
+        double proportional;
         double derivative;
 
         double velocity;
 
-        double directionToTarget;
-
         double velocityX;
         double velocityY;
 
-        double velocityXRobotCentric;
-        double velocityYRobotCentric;
+        double velocityXAccountedForHeading;
+        double velocityYAccountedForHeading;
 
-        // TODO: added vel check
         while(Math.abs(distanceToTarget) > positionThreshold || Math.abs(headingError) > headingThreshold || Math.abs(velocityTowardTarget) > velocityThreshold) {
             if(!((LinearOpMode) callingOpMode).opModeIsActive()) {
                 return;
@@ -110,13 +108,15 @@ public class HardwareBase27545 extends DraculaBase {
                     Math.abs(targetYPos - currentYPos),
                     Math.abs(targetXPos - currentXPos)
             );
+            // Get theta to target in radians
+            directionToTarget = Math.atan2(targetYPos - currentYPos, targetXPos - currentXPos);
 
             // Update heading
             currentHeading = getOdoFieldHeading();
             headingError = targetHeading - currentHeading;
 
             // Update velocity
-            currentXVel = vel.getX(DistanceUnit.INCH); // vel = Inch / sec (according to gobilda)
+            currentXVel = vel.getX(DistanceUnit.INCH); // vel = inch/sec
             currentYVel = vel.getY(DistanceUnit.INCH);
 
             velocityTowardTarget = Math.hypot(
@@ -124,27 +124,26 @@ public class HardwareBase27545 extends DraculaBase {
                     Math.abs(currentXVel)
             );
 
+            // proportional = distance * Kp
+            proportional =  distanceToTarget * proportionalGain;
+
             // derivative = -1(velocity) * Kd
             derivative = -(velocityTowardTarget * derivativeGain);
 
             // velocity = proportional + derivative
             // min drive speed < velocity < max drive speed
-            velocity = Math.min(maxSpeed, distanceToTarget*proportionalGain + derivative);
+            velocity = Math.min(maxSpeed, proportional + derivative);
             velocity = Math.max(velocity, 0.1);
-
-            // Get theta to target in radians
-            directionToTarget = Math.atan2(targetYPos - currentYPos,targetXPos - currentXPos);
 
             // Calculate directional velocity
             velocityX = velocity * Math.cos(directionToTarget);
             velocityY = velocity * Math.sin(directionToTarget);
 
             // Calculate strafe w/ directional velocity at current heading
-            velocityXRobotCentric=velocityX*Math.sin(currentHeading)-velocityY*Math.cos(currentHeading);
-            velocityYRobotCentric=velocityX*Math.cos(currentHeading)+velocityY*Math.sin(currentHeading);
-            r = Turn(maxSpeed,targetHeading);
+            velocityXAccountedForHeading = velocityX * Math.sin(currentHeading) - velocityY * Math.cos(currentHeading);
+            velocityYAccountedForHeading = velocityX * Math.cos(currentHeading) + velocityY * Math.sin(currentHeading);
 
-            applyMecPower2(-velocityXRobotCentric,-velocityYRobotCentric, r);
+            applyMecPower2(-velocityXAccountedForHeading,-velocityYAccountedForHeading, Turn(maxSpeed, targetHeading));
         }
         setWheelMotorPower(0, 0, 0, 0);
         //applyMecPower2(0,0,0);
