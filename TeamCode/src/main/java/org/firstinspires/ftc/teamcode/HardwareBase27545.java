@@ -42,7 +42,7 @@ public class HardwareBase27545 extends DraculaBase {
         odometryComputer.resetPosAndIMU();
     }
 
-    public void driveTo(double xTarg, double yTarg, double desiredHeading, double driveSpeed) {
+    public void driveTo(double targetXPos, double targetYPos, double targetHeading, double maxSpeed) {
         //autonomous navigation
 
         double headingThreshold = 1.5;
@@ -61,13 +61,13 @@ public class HardwareBase27545 extends DraculaBase {
         double currentYPos = pos.getY(DistanceUnit.INCH);
 
         double distanceToTarget = Math.hypot(
-                Math.abs(yTarg - currentYPos),
-                Math.abs(xTarg - currentXPos)
+                Math.abs(targetYPos - currentYPos),
+                Math.abs(targetXPos - currentXPos)
         );
 
         // Update heading
         double currentHeading = getOdoFieldHeading();
-        double headingError = desiredHeading - currentHeading;
+        double headingError = targetHeading - currentHeading;
 
         // Update velocity
         double currentXVel = vel.getX(DistanceUnit.INCH); // vel = Inch / sec (according to gobilda)
@@ -92,7 +92,7 @@ public class HardwareBase27545 extends DraculaBase {
         double velocityYRobotCentric;
 
         // TODO: added vel check
-        while(Math.abs(distanceToTarget) > positionThreshold || Math.abs(headingError) > headingThreshold) {
+        while(Math.abs(distanceToTarget) > positionThreshold || Math.abs(headingError) > headingThreshold || Math.abs(velocityTowardTarget) > velocityThreshold) {
             if(!((LinearOpMode) callingOpMode).opModeIsActive()) {
                 return;
             }
@@ -107,13 +107,13 @@ public class HardwareBase27545 extends DraculaBase {
             currentYPos = pos.getY(DistanceUnit.INCH);
 
             distanceToTarget = Math.hypot(
-                    Math.abs(yTarg - currentYPos),
-                    Math.abs(xTarg - currentXPos)
+                    Math.abs(targetYPos - currentYPos),
+                    Math.abs(targetXPos - currentXPos)
             );
 
             // Update heading
             currentHeading = getOdoFieldHeading();
-            headingError = desiredHeading - currentHeading;
+            headingError = targetHeading - currentHeading;
 
             // Update velocity
             currentXVel = vel.getX(DistanceUnit.INCH); // vel = Inch / sec (according to gobilda)
@@ -129,11 +129,11 @@ public class HardwareBase27545 extends DraculaBase {
 
             // velocity = proportional + derivative
             // min drive speed < velocity < max drive speed
-            velocity = Math.min(driveSpeed, distanceToTarget*proportionalGain + derivative);
+            velocity = Math.min(maxSpeed, distanceToTarget*proportionalGain + derivative);
             velocity = Math.max(velocity, 0.1);
 
             // Get theta to target in radians
-            directionToTarget = Math.atan2(yTarg - currentYPos,xTarg - currentXPos);
+            directionToTarget = Math.atan2(targetYPos - currentYPos,targetXPos - currentXPos);
 
             // Calculate directional velocity
             velocityX = velocity * Math.cos(directionToTarget);
@@ -142,7 +142,7 @@ public class HardwareBase27545 extends DraculaBase {
             // Calculate strafe w/ directional velocity at current heading
             velocityXRobotCentric=velocityX*Math.sin(currentHeading)-velocityY*Math.cos(currentHeading);
             velocityYRobotCentric=velocityX*Math.cos(currentHeading)+velocityY*Math.sin(currentHeading);
-            r = Turn(driveSpeed,desiredHeading);
+            r = Turn(maxSpeed,targetHeading);
 
             applyMecPower2(-velocityXRobotCentric,-velocityYRobotCentric, r);
         }
