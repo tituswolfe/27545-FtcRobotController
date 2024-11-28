@@ -44,88 +44,111 @@ public class HardwareBase27545 extends DraculaBase {
 
     public void driveTo(double xTarg, double yTarg, double desiredHeading, double driveSpeed) {
         //autonomous navigation
+
+        double headingThreshold = 1.5;
+        double positionThreshold = 1.5;
+        double velocityThreshold = 1;
+
+        double proportionalGain = 0.1; // Kp
+        double derivativeGain = 0.1; // Kd
+
         odometryComputer.bulkUpdate();
-
-        double headingThreshold=1.5, closeEnough=1.5,
-                distanceToTarget,directionToTarget,headingError,Kp=.1;
-        double v,vx,vy,vStrafeRobot,vForwardRobot;
-        double currentX,currentY,currentHeading;
-
         Pose2DGobilda pos = odometryComputer.getPosition();
         Pose2DGobilda vel = odometryComputer.getVelocity();
-        currentX=pos.getX(DistanceUnit.INCH);
-        currentY=pos.getY(DistanceUnit.INCH);
 
-        distanceToTarget=Math.hypot(Math.abs(xTarg - currentX),
-                Math.abs(yTarg - currentY));
-        currentHeading=getOdoFieldHeading();
-        headingError= desiredHeading-currentHeading;
+        // Update position
+        double currentXPos = pos.getX(DistanceUnit.INCH);
+        double currentYPos = pos.getY(DistanceUnit.INCH);
 
-        double currentXVel;
-        double currentYVel;
-        double velocityToTarget;
+        double distanceToTarget = Math.hypot(
+                Math.abs(yTarg - currentYPos),
+                Math.abs(xTarg - currentXPos)
+        );
+
+        // Update heading
+        double currentHeading = getOdoFieldHeading();
+        double headingError = desiredHeading - currentHeading;
+
+        // Update velocity
+        double currentXVel = vel.getX(DistanceUnit.INCH); // vel = Inch / sec (according to gobilda)
+        double currentYVel = vel.getY(DistanceUnit.INCH);
+
+        double velocityTowardTarget = Math.hypot(
+                Math.abs(currentYVel),
+                Math.abs(currentXVel)
+        );
+
+
         double derivative;
-        double Kd = 0.1;
 
-        // now loop and drive toward the target pose
-        while(Math.abs(distanceToTarget) > closeEnough || Math.abs(headingError)>headingThreshold) {
+        double velocity;
+
+        double directionToTarget;
+
+        double velocityX;
+        double velocityY;
+
+        double velocityXRobotCentric;
+        double velocityYRobotCentric;
+
+        // TODO: added vel check
+        while(Math.abs(distanceToTarget) > positionThreshold || Math.abs(headingError) > headingThreshold) {
             if(!((LinearOpMode) callingOpMode).opModeIsActive()) {
                 return;
             }
 
-
+            // Get position and velocity
             odometryComputer.bulkUpdate();
             vel = odometryComputer.getVelocity();
-            pos = odometryComputer.getPosition();// update position for robot
-            currentX=pos.getX(DistanceUnit.INCH);
-            currentY=pos.getY(DistanceUnit.INCH);
-            currentHeading=getOdoFieldHeading(); // was radians
-            headingError= desiredHeading-currentHeading;
+            pos = odometryComputer.getPosition();
 
-            distanceToTarget=Math.hypot(Math.abs(yTarg - currentY),
-                    Math.abs(xTarg - currentX));
+            // Update position
+            currentXPos = pos.getX(DistanceUnit.INCH);
+            currentYPos = pos.getY(DistanceUnit.INCH);
 
+            distanceToTarget = Math.hypot(
+                    Math.abs(yTarg - currentYPos),
+                    Math.abs(xTarg - currentXPos)
+            );
+
+            // Update heading
+            currentHeading = getOdoFieldHeading();
+            headingError = desiredHeading - currentHeading;
+
+            // Update velocity
             currentXVel = vel.getX(DistanceUnit.INCH); // vel = Inch / sec (according to gobilda)
             currentYVel = vel.getY(DistanceUnit.INCH);
-            velocityToTarget = Math.hypot(Math.abs(currentYVel), Math.abs(currentXVel));
-            derivative = Kd * velocityToTarget;
 
+            velocityTowardTarget = Math.hypot(
+                    Math.abs(currentYVel),
+                    Math.abs(currentXVel)
+            );
 
-            v=Math.min(driveSpeed,distanceToTarget*Kp - derivative);
-            v=Math.max(v,.1);
-           // v *= 0.1;
-            // v is the magnitude of the velocity vector we want the robot
-            // to execute on the field. This will be v until it gets
-            // close, then it will proportionately decrease until it slows
+            // derivative = -1(velocity) * Kd
+            derivative = -(velocityTowardTarget * derivativeGain);
 
-            // to a minimum of .1, (so it keeps moving until it gets close
-            // enough)
-          // directionToTarget=Math.atan2(xTarg-currentX,yTarg-currentY);
-             directionToTarget=Math.atan2(yTarg-currentY,xTarg-currentX);
-            // this is the angle on the field in radians ccw from the field
-            // X axis. Now we have the magnitude and direction we want to
-            // drive on the field, we can figure out the forward and
-            // strafing powers to send to the mecum drive
+            // velocity = proportional + derivative
+            // min drive speed < velocity < max drive speed
+            velocity = Math.min(driveSpeed, distanceToTarget*proportionalGain + derivative);
+            velocity = Math.max(velocity, 0.1);
 
-            // first lets calculate the x and y components of the field
-            // velocity vector... for this we need the direction to the
-            // target
-            vx= v*Math.cos(directionToTarget);
-            vy= v*Math.sin(directionToTarget);
-            // now let’s do the coordinate transformation to the robot
-            // coordinate system.. which is rotated relative to the field by the
-            // current heading
-            vStrafeRobot=vx*Math.sin(currentHeading)-vy*Math.cos(currentHeading);
-            vForwardRobot=vx*Math.cos(currentHeading)+vy*Math.sin(currentHeading);
+            // Get theta to target in radians
+            directionToTarget = Math.atan2(yTarg - currentYPos,xTarg - currentXPos);
+
+            // Calculate directional velocity
+            velocityX = velocity * Math.cos(directionToTarget);
+            velocityY = velocity * Math.sin(directionToTarget);
+
+            // Calculate strafe w/ directional velocity at current heading
+            velocityXRobotCentric=velocityX*Math.sin(currentHeading)-velocityY*Math.cos(currentHeading);
+            velocityYRobotCentric=velocityX*Math.cos(currentHeading)+velocityY*Math.sin(currentHeading);
             r = Turn(driveSpeed,desiredHeading);
-            
-            // send these motor powers to the mecanum drive
-            applyMecPower2(-vStrafeRobot,-vForwardRobot,r);
 
-        } // end of the while loop
-        applyMecPower2(0,0,0);
-        
-    } // end of the method... target position is reached.
+            applyMecPower2(-velocityXRobotCentric,-velocityYRobotCentric, r);
+        }
+        setWheelMotorPower(0, 0, 0, 0);
+        //applyMecPower2(0,0,0);
+    }
 
 
     public void score(){
